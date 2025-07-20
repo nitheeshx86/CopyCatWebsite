@@ -789,13 +789,13 @@
 
     <footer>
         <div class="container">
-            <p>&copy; 2024 CopyCat. Made with ❤️ by Nitheesh K. at VIT.</p>
+            <p>&copy; 2025 CopyCat. Made with ❤️ by Nitheesh K. at VIT, Chennai.</p>
         </div>
     </footer>
 
 <script>
     const themeIcon = document.getElementById('theme-icon');
-    const themeText = document.getElrementById('theme-text');
+    const themeText = document.getElementById('theme-text'); // ✅ Fixed typo here
     const body = document.body;
     let currentTheme = body.getAttribute('data-theme') || 'dark';
 
@@ -836,6 +836,7 @@
         window.location.href = 'CopyCat.dmg';
     }
 </script>
+
 </body>
 </html>
 
