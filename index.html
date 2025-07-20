@@ -1,0 +1,841 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CopyCat - Your macOS Clipboard, Evolved</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #0a0a0a;
+            --bg-secondary: #111111;
+            --bg-tertiary: #1a1a1a;
+            --text-primary: #ffffff;
+            --text-secondary: #a3a3a3;
+            --accent-primary: #667eea;
+            --accent-secondary: #764ba2;
+            --accent-tertiary: #ff6b6b;
+            --border-color: #333333;
+            --glass-bg: rgba(255, 255, 255, 0.05);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            transition: all 0.5s ease-in-out;
+        }
+
+        [data-theme="light"] {
+            --bg-primary: #ffffff;
+            --bg-secondary: #f8f9fa;
+            --bg-tertiary: #e9ecef;
+            --text-primary: #1a1a1a;
+            --text-secondary: #666666;
+            --border-color: #e0e0e0;
+            --glass-bg: rgba(0, 0, 0, 0.05);
+            --glass-border: rgba(0, 0, 0, 0.1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html {
+            font-size: 14px;
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: var(--text-primary);
+            background: var(--bg-primary);
+            overflow-x: hidden;
+            transition: background-color 0.6s ease-in-out, color 0.6s ease-in-out;
+        }
+
+        ::selection {
+            background: pink;
+            color: black;
+        }
+
+        /* Animated Background */
+        .animated-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -2;
+            background: var(--bg-primary);
+        }
+
+        .light-beam {
+            position: absolute;
+            background: linear-gradient(45deg, 
+                transparent 30%, 
+                rgba(102, 126, 234, 0.1) 50%, 
+                rgba(118, 75, 162, 0.05) 70%, 
+                transparent 100%);
+            transform-origin: center;
+            animation: rotateBeam 20s linear infinite;
+        }
+
+        .light-beam:nth-child(1) {
+            width: 200%;
+            height: 2px;
+            top: 20%;
+            left: -50%;
+            animation-delay: 0s;
+        }
+
+        .light-beam:nth-child(2) {
+            width: 150%;
+            height: 1px;
+            top: 40%;
+            right: -25%;
+            animation-delay: -7s;
+            animation-direction: reverse;
+        }
+
+        .light-beam:nth-child(3) {
+            width: 180%;
+            height: 1.5px;
+            bottom: 30%;
+            left: -40%;
+            animation-delay: -14s;
+        }
+
+        .light-beam:nth-child(4) {
+            width: 120%;
+            height: 1px;
+            top: 60%;
+            right: -10%;
+            animation-delay: -3s;
+            animation-direction: reverse;
+        }
+
+        .light-beam:nth-child(5) {
+            width: 160%;
+            height: 2px;
+            bottom: 10%;
+            left: -30%;
+            animation-delay: -10s;
+        }
+
+        @keyframes rotateBeam {
+            0% { transform: rotate(0deg) translateX(0); opacity: 0; }
+            10% { opacity: 1; }
+            90% { opacity: 1; }
+            100% { transform: rotate(360deg) translateX(100px); opacity: 0; }
+        }
+
+        /* Fixed theme toggle in bottom right */
+        .theme-toggle {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            background: var(--glass-bg);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--glass-border);
+            border-radius: 50px;
+            padding: 12px 18px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+            color: var(--text-secondary);
+            user-select: none;
+            height: 50px;
+            transition: all 0.4s ease-in-out;
+            z-index: 1001;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+        }
+
+        .theme-toggle:hover {
+            transform: scale(1.05);
+            background: var(--glass-bg);
+            box-shadow: 0 12px 35px rgba(0, 0, 0, 0.2);
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+
+        /* Header */
+        header {
+            position: fixed;
+            top: 0;
+            width: 100%;
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--glass-border);
+            z-index: 1000;
+            transition: all 0.3s ease;
+        }
+
+        nav {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 2rem;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 1.6rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            text-decoration: none;
+        }
+
+        .logo svg {
+            width: 42px;
+            height: 42px;
+            transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            filter: drop-shadow(0 0 10px rgba(102, 126, 234, 0.3));
+        }
+
+        .logo:hover svg {
+            transform: rotate(15deg) scale(1.1);
+            filter: drop-shadow(0 0 20px rgba(102, 126, 234, 0.5));
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 2.5rem;
+            list-style: none;
+        }
+
+        .nav-links a {
+            text-decoration: none;
+            color: var(--text-secondary);
+            font-weight: 500;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .nav-links a::after {
+            content: '';
+            position: absolute;
+            bottom: -4px;
+            left: 0;
+            width: 0;
+            height: 2px;
+            background: linear-gradient(45deg, var(--accent-primary), var(--accent-secondary));
+            transition: width 0.3s ease;
+        }
+
+        .nav-links a:hover {
+            color: var(--text-primary);
+        }
+
+        .nav-links a:hover::after {
+            width: 100%;
+        }
+
+        /* Hero Section */
+        .hero {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero-content {
+            z-index: 2;
+            animation: fadeInUp 1.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .hero h1 {
+            font-size: clamp(3rem, 6vw, 5rem);
+            font-weight: 700;
+            margin-bottom: 1.5rem;
+            background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary), var(--accent-tertiary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            text-shadow: 0 0 40px rgba(102, 126, 234, 0.3);
+            letter-spacing: -0.02em;
+        }
+
+        .hero p {
+            font-size: 1.3rem;
+            margin-bottom: 2.5rem;
+            color: var(--text-secondary);
+            max-width: 700px;
+            margin-left: auto;
+            margin-right: auto;
+            line-height: 1.7;
+        }
+
+        .cta-button {
+            display: inline-block;
+            background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+            color: white;
+            padding: 1.2rem 2.5rem;
+            border-radius: 50px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 1.1rem;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            border: none;
+            cursor: pointer;
+            box-shadow: 0 20px 40px rgba(102, 126, 234, 0.3);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .cta-button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: left 0.5s ease;
+        }
+
+        .cta-button:hover::before {
+            left: 100%;
+        }
+
+        .cta-button:hover {
+            transform: translateY(-5px) scale(1.05);
+            box-shadow: 0 25px 60px rgba(102, 126, 234, 0.4);
+        }
+
+        /* Floating orbs */
+        .floating-orb {
+            position: absolute;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(102, 126, 234, 0.3), transparent);
+            animation: float 8s ease-in-out infinite;
+            pointer-events: none;
+        }
+
+        .floating-orb:nth-child(1) { 
+            top: 15%; left: 8%; width: 100px; height: 100px; 
+            animation-delay: 0s; 
+        }
+        .floating-orb:nth-child(2) { 
+            top: 65%; right: 12%; width: 150px; height: 150px; 
+            animation-delay: 2s; 
+        }
+        .floating-orb:nth-child(3) { 
+            bottom: 25%; left: 15%; width: 80px; height: 80px; 
+            animation-delay: 4s; 
+        }
+
+        /* Glassmorphism Cards */
+        .glass-card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            padding: 2.5rem;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .glass-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(102, 126, 234, 0.5), transparent);
+        }
+
+        .glass-card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 30px 60px rgba(0, 0, 0, 0.3);
+            border-color: rgba(102, 126, 234, 0.3);
+        }
+
+        /* Features Section */
+        .features {
+            padding: 8rem 0;
+            background: var(--bg-secondary);
+            position: relative;
+        }
+
+        .features h2 {
+            text-align: center;
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            color: var(--text-primary);
+            font-weight: 700;
+        }
+
+        .features-subtitle {
+            text-align: center;
+            font-size: 1.2rem;
+            color: var(--text-secondary);
+            max-width: 600px;
+            margin: 0 auto 4rem auto;
+            line-height: 1.6;
+        }
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 2rem;
+            margin-top: 4rem;
+        }
+
+        .feature-icon {
+            font-size: 3.5rem;
+            margin-bottom: 1.5rem;
+            display: block;
+            filter: drop-shadow(0 0 20px rgba(102, 126, 234, 0.3));
+        }
+
+        .glass-card h3 {
+            font-size: 1.6rem;
+            margin-bottom: 1rem;
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+
+        .glass-card p {
+            color: var(--text-secondary);
+            line-height: 1.7;
+            font-size: 1rem;
+        }
+
+        /* Developer Section */
+        .developer {
+            padding: 8rem 0;
+            background: var(--bg-primary);
+            text-align: center;
+            position: relative;
+        }
+
+        .developer-content {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .developer h2 {
+            font-size: 3rem;
+            margin-bottom: 2rem;
+            color: var(--text-primary);
+            font-weight: 700;
+        }
+
+        .developer p {
+            font-size: 1.2rem;
+            color: var(--text-secondary);
+            margin-bottom: 2rem;
+            line-height: 1.7;
+        }
+
+        .contact-info {
+            background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+            color: white;
+            padding: 3rem;
+            border-radius: 20px;
+            margin-top: 3rem;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .contact-info::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+            animation: shimmer 4s ease-in-out infinite;
+        }
+
+        @keyframes shimmer {
+            0%, 100% { transform: translate(-50%, -50%) rotate(0deg); }
+            50% { transform: translate(-50%, -50%) rotate(180deg); }
+        }
+
+        .contact-info h3 {
+            color: #fff;
+            font-size: 1.8rem;
+            margin-bottom: 1rem;
+        }
+
+        .contact-info p {
+            color: rgba(255, 255, 255, 0.9);
+            font-size: 1.1rem;
+        }
+
+        .contact-links {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 2rem;
+            margin-top: 2rem;
+            flex-wrap: wrap;
+        }
+
+        .contact-links a {
+            background: rgba(255,255,255,0.2);
+            padding: 1rem 2rem;
+            border-radius: 25px;
+            color: #fff;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            backdrop-filter: blur(10px);
+        }
+
+        .contact-links a:hover {
+            background: rgba(255,255,255,0.3);
+            transform: translateY(-2px);
+        }
+
+        /* Download Section */
+        #download {
+            background: linear-gradient(135deg, #8e44ad 0%, #9b59b6 100%) !important;
+            padding: 8rem 0 !important;
+            text-align: center !important;
+            min-height: auto !important;
+            position: relative;
+            overflow: hidden;
+        }
+
+        #download::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grid" width="10" height="10" patternUnits="userSpaceOnUse"><path d="M 10 0 L 0 0 0 10" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="0.5"/></pattern></defs><rect width="100" height="100" fill="url(%23grid)"/></svg>');
+            opacity: 0.3;
+        }
+
+        #download .container {
+            position: relative;
+            z-index: 2;
+        }
+
+        #download h1 {
+            font-size: clamp(2.5rem, 5vw, 4rem);
+            font-weight: 700;
+            margin-bottom: 1.5rem;
+            color: white;
+            text-shadow: 0 0 30px rgba(255, 255, 255, 0.3);
+        }
+
+        #download p {
+            font-size: 1.3rem;
+            margin-bottom: 2.5rem;
+            color: rgba(255, 255, 255, 0.9);
+            max-width: 700px;
+            margin-left: auto;
+            margin-right: auto;
+            line-height: 1.7;
+        }
+
+        /* Footer */
+        footer {
+            background: var(--bg-tertiary);
+            color: var(--text-secondary);
+            text-align: center;
+            padding: 3rem 0;
+            border-top: 1px solid var(--border-color);
+        }
+
+        /* Animations */
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(40px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0px) scale(1); opacity: 0.7; }
+            50% { transform: translateY(-30px) scale(1.1); opacity: 1; }
+        }
+
+        /* Particles only in hero section */
+        .hero .particle {
+            position: absolute;
+            width: 3px;
+            height: 3px;
+            background: var(--accent-primary);
+            border-radius: 50%;
+            pointer-events: none;
+            animation: particleFloat 12s linear infinite;
+            box-shadow: 0 0 10px var(--accent-primary);
+        }
+
+        @keyframes particleFloat {
+            0% {
+                transform: translateY(100vh) translateX(0) scale(0);
+                opacity: 0;
+            }
+            10% {
+                opacity: 1;
+                transform: scale(1);
+            }
+            90% {
+                opacity: 1;
+            }
+            100% {
+                transform: translateY(-100px) translateX(200px) scale(0);
+                opacity: 0;
+            }
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .nav-links {
+                display: none;
+            }
+            
+            .hero h1 {
+                font-size: 2.5rem;
+            }
+            
+            .features-grid {
+                grid-template-columns: 1fr;
+                gap: 1.5rem;
+            }
+
+            .contact-links {
+                flex-direction: column;
+            }
+
+            .theme-toggle {
+                bottom: 20px;
+                right: 20px;
+                padding: 10px 14px;
+                height: 45px;
+            }
+        }
+
+        /* Code font for certain elements */
+        .code-font {
+            font-family: 'JetBrains Mono', 'Monaco', 'Courier New', monospace;
+        }
+
+        /* Enhanced scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg-secondary);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: linear-gradient(var(--accent-primary), var(--accent-secondary));
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(var(--accent-secondary), var(--accent-primary));
+        }
+    </style>
+</head>
+<body data-theme="dark">
+    <div class="animated-bg">
+        <div class="light-beam"></div>
+        <div class="light-beam"></div>
+        <div class="light-beam"></div>
+        <div class="light-beam"></div>
+        <div class="light-beam"></div>
+    </div>
+
+    <header>
+        <nav>
+            <a href="#" class="logo">
+                <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="100" cy="100" r="60" fill="none" stroke="url(#gradient1)" stroke-width="6"/>
+                    <path d="M 65 50 Q 60 20 90 45" fill="none" stroke="url(#gradient1)" stroke-width="6" stroke-linecap="round"/>
+                    <path d="M 135 50 Q 140 20 110 45" fill="none" stroke="url(#gradient1)" stroke-width="6" stroke-linecap="round"/>
+                    <path d="M 80 85 Q 85 75 90 85" fill="none" stroke="url(#gradient1)" stroke-width="5" stroke-linecap="round"/>
+                    <path d="M 110 85 Q 115 75 120 85" fill="none" stroke="url(#gradient1)" stroke-width="5" stroke-linecap="round"/>
+                    <path d="M 95 105 L 100 110 L 105 105" fill="none" stroke="url(#gradient1)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+                    <path d="M 100 112 Q 90 120 85 115" fill="none" stroke="url(#gradient1)" stroke-width="4" stroke-linecap="round"/>
+                    <path d="M 100 112 Q 110 120 115 115" fill="none" stroke="url(#gradient1)" stroke-width="4" stroke-linecap="round"/>
+                    <line x1="45" y1="95" x2="75" y2="100" stroke="url(#gradient1)" stroke-width="4" stroke-linecap="round"/>
+                    <line x1="45" y1="110" x2="75" y2="110" stroke="url(#gradient1)" stroke-width="4" stroke-linecap="round"/>
+                    <line x1="155" y1="95" x2="125" y2="100" stroke="url(#gradient1)" stroke-width="4" stroke-linecap="round"/>
+                    <line x1="155" y1="110" x2="125" y2="110" stroke="url(#gradient1)" stroke-width="4" stroke-linecap="round"/>
+                    <defs>
+                        <linearGradient id="gradient1" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" style="stop-color:#667eea"/>
+                            <stop offset="100%" style="stop-color:#764ba2"/>
+                        </linearGradient>
+                    </defs>
+                </svg>
+                CopyCat
+            </a>
+            <ul class="nav-links">
+                <li><a href="#features">Features</a></li>
+                <li><a href="#developer">Developer</a></li>
+                <li><a href="#download">Download</a></li>
+            </ul>
+        </nav>
+    </header>
+
+    <!-- Fixed theme toggle button -->
+    <div class="theme-toggle" onclick="toggleTheme()">
+        <span id="theme-icon">🌙</span>
+        <span id="theme-text">Dark</span>
+    </div>
+
+    <section class="hero">
+        <div class="floating-orb"></div>
+        <div class="floating-orb"></div>
+        <div class="floating-orb"></div>
+        
+        <div class="hero-content">
+            <h1>Your macOS Clipboard, Evolved</h1>
+            <p>Tired of copying one thing, only to lose another? Meet CopyCat, the intuitive clipboard history app for macOS that remembers everything you copy, so you don't have to.</p>
+            <button class="cta-button" onclick="scrollToSection('download')">
+                ✨ Download Beta 1
+            </button>
+        </div>
+    </section>
+
+    <section class="features" id="features">
+        <div class="container">
+            <h2>Never Lose a Copy Again</h2>
+            <p class="features-subtitle">CopyCat runs silently in your menu bar, diligently tracking every piece of text, image, or file you copy.</p>
+            
+            <div class="features-grid">
+                <div class="glass-card">
+                    <span class="feature-icon">🕐</span>
+                    <h3>Access Past Copies</h3>
+                    <p>Scroll through a complete history of everything you've copied. Never lose important information again with our intuitive timeline interface.</p>
+                </div>
+                
+                <div class="glass-card">
+                    <span class="feature-icon">📋</span>
+                    <h3>Paste with Precision</h3>
+                    <p>Select any item from your history and paste it directly into your active application seamlessly. Works with any Mac app.</p>
+                </div>
+                
+                <div class="glass-card">
+                    <span class="feature-icon">🖼️</span>
+                    <h3>Multiple Formats (Coming Soon)</h3>
+                    <p>Future support for text, images, and files. CopyCat will handle all your copying needs in one unified interface.</p>
+                </div>
+                
+                <div class="glass-card">
+                    <span class="feature-icon">🔒</span>
+                    <h3>Menu Bar Integration</h3>
+                    <p>Lives quietly in your menu bar, always accessible but never intrusive to your workflow. Native macOS experience.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="developer" id="developer">
+        <div class="container">
+            <div class="developer-content">
+                <h2>From the Developer</h2>
+                <p>Hi, I'm <strong>Nitheesh K.</strong> from Vellore Institute of Technology. CopyCat is my very first macOS and Swift application, and I'm thrilled to share this Beta 1 with you.</p>
+                <p>It's been an exciting journey learning the intricacies of macOS development, and I'm committed to making CopyCat an essential tool for every Mac user.</p>
+                
+                <div class="contact-info">
+                    <h3>💌 Have Questions or Feedback?</h3>
+                    <p>I'd love to hear from you! Reach out to me with any thoughts, suggestions, or bug reports.</p>
+                    <div class="contact-links">
+                        <a href="mailto:nitheesh.k2024@vitstudent.ac.in" class="code-font">
+                            📧 nitheesh.k2024@vitstudent.ac.in
+                        </a>
+                        <a href="https://www.linkedin.com/in/10000aura/" target="_blank">
+                            💼 LinkedIn
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="download">
+        <div class="container">
+            <h1>Get CopyCat Beta 1 Today!</h1>
+            <p>Be among the first to experience a smarter way to manage your clipboard. Your feedback is invaluable as I continue to refine and enhance CopyCat.</p>
+            <button class="cta-button" style="background: white; color: #ff6b6b; box-shadow: 0 20px 40px rgba(255, 255, 255, 0.3);" onclick="downloadApp()">
+                📥 Download CopyCat Beta 1
+            </button>
+            <p style="margin-top: 1.5rem; opacity: 0.8; font-size: 1rem;">macOS 10.15+ required • Free Beta</p>
+        </div>
+    </section>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2024 CopyCat. Made with ❤️ by Nitheesh K. at VIT.</p>
+        </div>
+    </footer>
+
+<script>
+    const themeIcon = document.getElementById('theme-icon');
+    const themeText = document.getElrementById('theme-text');
+    const body = document.body;
+    let currentTheme = body.getAttribute('data-theme') || 'dark';
+
+    function applyTheme(theme) {
+        body.setAttribute('data-theme', theme);
+        localStorage.setItem('theme', theme);
+        currentTheme = theme;
+        if (theme === 'light') {
+            themeIcon.textContent = '☀️';
+            themeText.textContent = 'Light';
+        } else {
+            themeIcon.textContent = '🌙';
+            themeText.textContent = 'Dark';
+        }
+    }
+
+    function toggleTheme() {
+        const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+        applyTheme(newTheme);
+    }
+
+    // Load theme from localStorage if available
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme) {
+        applyTheme(savedTheme);
+    } else {
+        applyTheme(currentTheme);
+    }
+
+    function scrollToSection(id) {
+        const section = document.getElementById(id);
+        if (section) {
+            section.scrollIntoView({ behavior: 'smooth' });
+        }
+    }
+
+    function downloadApp() {
+        window.location.href = 'CopyCat.dmg';
+    }
+</script>
+</body>
+</html>
+
